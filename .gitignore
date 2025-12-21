@@ -1,0 +1,48 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Build output
+mifi-manager
+mifi-manager.exe
+mifi-manager-mac
+mifi-manager-linux
+build/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Config files with sensitive data (local testing)
+*.local.yaml
+test-config.yaml
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
