@@ -23,6 +23,14 @@ mifi-manager.exe
 mifi-manager-mac
 mifi-manager-linux
 build/
+mifimate
+mifimate.exe
+
+# Distribution and cross-compilation
+fyne-cross/
+releases/
+*.tar.xz
+*.zip
 
 # IDE specific files
 .vscode/

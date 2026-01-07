@@ -54,26 +54,61 @@ type App struct {
 	recentSMSContainer *fyne.Container
 
 	cachedDevices []api.ConnectedDevice
+
+	trayActions chan string
 }
 
 func NewApp(fyneApp fyne.App, client *api.Client, cfg *config.Config, logger *logrus.Logger) *App {
 	return &App{
-		FyneApp:   fyneApp,
-		APIClient: client,
-		Config:    cfg,
-		Logger:    logger,
+		FyneApp:     fyneApp,
+		APIClient:   client,
+		Config:      cfg,
+		Logger:      logger,
+		trayActions: make(chan string, 2),
 	}
 }
 
 func (a *App) CreateMainWindow() {
 	a.MainWindow = a.FyneApp.NewWindow("MiFiMate")
 	a.MainWindow.Resize(fyne.NewSize(800, 600))
+	a.MainWindow.SetIcon(GetAppIcon())
 
 	a.createComponents()
 
 	content := a.createLayout()
 
 	a.MainWindow.SetContent(content)
+
+	if a.Config != nil && a.Config.App.MinimizeToTray {
+		a.MainWindow.SetCloseIntercept(func() {
+			a.Logger.Info("Main window hidden to tray")
+			a.MainWindow.Hide()
+		})
+	}
+
+	// Handle tray actions in a separate loop
+	go a.handleTrayActions()
+}
+
+// handleTrayActions processes tray menu clicks from the systray event loop
+func (a *App) handleTrayActions() {
+	for action := range a.trayActions {
+		switch action {
+		case "show":
+			fyne.Do(func() {
+				if a.MainWindow != nil {
+					a.MainWindow.Show()
+					a.MainWindow.RequestFocus()
+				}
+			})
+		case "quit":
+			fyne.Do(func() {
+				if a.FyneApp != nil {
+					a.FyneApp.Quit()
+				}
+			})
+		}
+	}
 }
 
 func (a *App) AutoLogin() {
@@ -383,11 +418,31 @@ func (a *App) updateStatus(status *api.DeviceStatus) {
 }
 
 func (a *App) updateStatusSafe(status *api.DeviceStatus) {
-	// Queue all UI updates on the main thread
-	go func() {
-		fyne.CurrentApp().Driver().CanvasForObject(a.statusLabel).Refresh(a.statusLabel)
-	}()
+	// Ensure UI updates happen on the main thread to avoid Fyne thread errors.
+	if runner, ok := fyne.CurrentApp().Driver().(interface{ RunOnMain(func()) }); ok {
+		runner.RunOnMain(func() {
+			if a.statusLabel == nil {
+				return
+			}
 
+			a.statusLabel.SetText("Status: Connected")
+			a.networkTypeLabel.SetText(status.NetworkType)
+
+			signalQuality := utils.GetSignalQuality(status.SignalStrength)
+			a.signalLabel.SetText(fmt.Sprintf("%d bars (%s)", status.SignalStrength, signalQuality))
+
+			batteryStatus := utils.GetBatteryStatus(status.BatteryLevel)
+			a.batteryLabel.SetText(fmt.Sprintf("%d%% (%s)", status.BatteryLevel, batteryStatus))
+
+			a.ipAddressLabel.SetText(status.WanIPAddress)
+			a.connectedDevLabel.SetText(strconv.Itoa(status.ConnectedDevs))
+			a.txSpeedLabel.SetText(utils.FormatSpeed(status.TxSpeed))
+			a.rxSpeedLabel.SetText(utils.FormatSpeed(status.RxSpeed))
+		})
+		return
+	}
+
+	// Fallback (should not normally hit). This may still be unsafe on some drivers.
 	a.statusLabel.SetText("Status: Connected")
 	a.networkTypeLabel.SetText(status.NetworkType)
 

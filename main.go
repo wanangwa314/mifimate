@@ -7,6 +7,7 @@ import (
 	"mifi_app/internal/utils"
 
 	"fyne.io/fyne/v2/app"
+	"fyne.io/systray"
 )
 
 func main() {
@@ -24,9 +25,22 @@ func main() {
 	)
 
 	fyneApp := app.New()
+	fyneApp.SetIcon(ui.GetAppIcon())
 
 	mifiApp := ui.NewApp(fyneApp, apiClient, cfg, logger)
 	mifiApp.CreateMainWindow()
+
+	ready := make(chan struct{})
+
+	// Start system tray in a goroutine so it doesn't block the main thread
+	go func() {
+		mifiApp.StartSystemTray(func() {
+			close(ready)
+		})
+	}()
+
+	// Wait for tray to be ready before showing window
+	<-ready
 
 	mifiApp.AutoLogin()
 
@@ -34,4 +48,5 @@ func main() {
 	mifiApp.MainWindow.ShowAndRun()
 
 	logger.Info("Application closed")
+	systray.Quit()
 }
